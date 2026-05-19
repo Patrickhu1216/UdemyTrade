@@ -1,39 +1,39 @@
 # Lecture 1：量化輪動交易系統研發筆記
 
-## 🎯 本堂核心觀念 (Key Insights)
+## 本堂核心觀念 (Key Insights)
 
 ### 1. 從「相對報酬」到「標準分數」的邏輯躍升
 在探索性數據分析（EDA）的前期階段，我們將 SPY（市值加權）與 RSP（等權重）的滾動報酬率疊加在同一個圖表上。雖然這能讓我們看出兩者存在潛在的風格轉換週期，但因為兩者皆為獨立的絕對數值，我們很難在視覺或程式邏輯上精確衡量「橡皮筋到底被拉扯得有多開」。
 
 為了解決這個痛點，並將觀察轉化為具備可操作性的交易訊號（Signal Generation），我們的量化解法分為兩步：
+
 * **第一步：取價差 (Differential)** —— 用 SPY 的滾動報酬率減去 RSP 的滾動報酬率（$\text{SPY Return} - \text{RSP Return}$）。如此一來，繁雜的雙線圖就會濃縮為單一線條，直觀呈現兩者的相對強弱。
 * **第二步：標準化 (Z-Score)** —— 絕對價差在不同的市場時期（如高波動的金融海嘯時期與低波動的常態牛市）其波動幅度截然不同，無法設定統一的絕對值門檻。透過將價差轉換為 **Z-Score（標準分數）**，我們便能以「偏離均值幾個標準差」的統計維度來統一衡量。當偏離程度超過特定標準差邊界時，即代表橡皮筋拉扯至極端，這就構成了策略執行輪動（Switch）的觸發核心。
 
----
+<br>
 
-## ⚠️ 量化模型的至高原則：消滅前瞻偏差 (Look-Ahead Bias)
+## 量化模型的至高原則：消滅前瞻偏差 (Look-Ahead Bias)
 
 在計算 Z-Score 時，如果直接對整個歷史資料集計算平均值（Mean）和標準差（Standard Deviation），就會犯下量化模型與機器學習中最致命的 cardinal sin（基要原罪）—— **前瞻偏差（Look-Ahead Bias）**。
-
 
 
 * **錯誤示範（全局標準化）：** 在歷史時間軸上的 2010 年某個交易日，使用了包含 2011 到 2024 年的未來數據來計算當時的 Z-Score。在實際交易中，你不可能預知未來。
 * **正確解法（擴展視窗 Expanding Window）：** 計算歷史上某一天 $t$ 的 Z-Score 時，**只能使用從歷史起點到當天 $t$ 的數據**。隨著時間往後推移，已知數據的資料庫會像滾雪球一樣越來越大（Expanding），但絕對不允許任何 $t+1$ 之後的未來資訊滲透進來。
 
-> 💡 **核心紀律：** 訓練集（Train Set）與測試集（Test Set）必須嚴格獨立進行標準化。絕對不能先對整個數據集做標準化，隨後才進行樣本內外的切分。
+> **核心紀律：** 訓練集（Train Set）與測試集（Test Set）必須嚴格獨立進行標準化。絕對不能先對整個數據集做標準化，隨後才進行樣本內外的切分。
 
----
+<br>
 
-## 📐 關鍵 Pandas 函數語法語意
+## 關鍵 Pandas 函數語法語意
 
 *   **`series.expanding().mean()` 與 `series.expanding().std()`：**
     Pandas 內建強大的動態擴展視窗方法。它與固定長度的 `rolling()` 不同，`expanding()` 的視窗起點固定，但終點會隨著資料列天天往後延伸，完美符合「僅使用歷史至今已知資料」的量化回測邏輯。
 *   **`df.where(cond)`：**
     防禦性程式碼（Defensive Coding）的重要工具。用以確保只有在滿足特定條件（如原始數據非空值 `notna()`）時才保留計算結果，避免無效的 `NaN` 破壞圖表連續性或引發策略誤判。
 
----
+<br>
 
-## 💻 Python 實作：價差計算與 Expanding Z-Score 建構
+## Python 實作：價差計算與 Expanding Z-Score 建構
 
 請在您的 Jupyter Notebook 或 Google Colab 中建立新儲存格，複製並執行以下完整的研發程式碼：
 
@@ -50,7 +50,6 @@ df_prices['Rolling_1M_diff'] = df_prices['Spy_rolling_1M'] - df_prices['Rsp_roll
 df_prices['Rolling_6M_diff'] = df_prices['Spy_rolling_6M'] - df_prices['Rsp_rolling_6M']
 df_prices['Rolling_1Y_diff'] = df_prices['Spy_rolling_1Y'] - df_prices['Rsp_rolling_1Y']
 
-<br>
 
 # ==============================================================================
 # Step 2: 撰寫擴展視窗 Z-Score 函數 (完美規避前瞻偏差)
@@ -71,7 +70,6 @@ def expanding_z_score(series):
     z_score = (series - expanding_mean) / expanding_std
     return z_score
 
-<br>
 
 # ==============================================================================
 # Step 3: 生成 Z-Score 特徵與缺失值 (NaN) 防禦處理
@@ -94,15 +92,18 @@ print(df_prices[['Rolling_1M_diff_z', 'Rolling_6M_diff_z', 'Rolling_1Y_diff_z']]
 
 ```
 
-### 🧠 策略建構前的量化腦力激盪 (Strategy Design Brainstorming)
+<br>
+
+### 策略建構前的量化腦力激盪 (Strategy Design Brainstorming)
 
 到目前為止，我們已經成功消除了數據的量綱（Units），將混亂的絕對報酬，凝聚成了一條在 `0` 軸上下擺動、以標準差為單位的**無量綱標準訊號線**。這意味著我們已經拿到了開啟自動化交易系統的鑰匙。
 
 在進入下一堂課的視覺化繪圖與回溯測試之前，我們必須深入探討以下兩個決定策略生死的核心量化權衡（Quant Trade-offs）：
 
----
+<br>
 
 #### 核心問題一：最佳窗口的權衡 (Optimal Lookback Window Optimization)
+
 我們引入了 1個月（21日）、6個月（126日）與 12個月（252日）的滾動視窗，哪一個回看窗口最適合用來捕捉這條「橡皮筋的彈回（均值回歸）」？
 
 短視窗與長視窗在實際交易中，各自面臨不同的系統性痛點：
@@ -114,12 +115,14 @@ print(df_prices[['Rolling_1M_diff_z', 'Rolling_6M_diff_z', 'Rolling_1Y_diff_z']]
 
 *   **量化思維：** 策略研發的目標並非尋找「完美視窗」，而是尋找能平衡**「雜訊過濾」**與**「訊號滯後」**的黃金分割點（通常中線視窗如 6M 在實務上較具備橡皮筋的拉扯與回歸特性）。
 
----
+<br>
 
 #### 核心問題二：臨界值的設定 (Threshold Optimization)
 我們應該將 Z-Score 的進場邊界（Trading Bands）設定在偏離均值的幾個標準差？是 $\pm 1.0\sigma$、$\pm 1.5\sigma$ 還是 $\pm 2.0\sigma$？
 
 這本質上是一場關於**「勝率 (Win Rate)」**與**「交易次數 (Trade Frequency)」**的經典拉鋸戰（Tug of War）：
+
+<br>
 
 *   **低臨界值 (如 $\pm 1.0\sigma$)：**
     *   *特徵：* 只要橡皮筋稍微拉開就會觸發交易。
@@ -128,7 +131,9 @@ print(df_prices[['Rolling_1M_diff_z', 'Rolling_6M_diff_z', 'Rolling_1Y_diff_z']]
     *   *特徵：* 只有當市場發生極端風格扭曲（如歷史級別的系統性危機或極端權值股暴拉）時才會觸發。
     *   *結果：* 根據統計學高斯分布，觸及此邊界的機率極低，因此**交易機會稀少 (Low Frequency)**；然而，一旦觸發，代表市場處於極度不合理的定價扭曲中，此時進場的**均值回歸勝率與獲利空間通常極高**。
 
-> 📌 **量化拉鋸核心 (The Quant Dilemma)：**
+<br>
+
+> **量化拉鋸核心 (The Quant Dilemma)：**
 > $$\text{High Threshold } (\pm 2.0\sigma) \longrightarrow \text{High Win Rate } \uparrow \ + \ \text{Low Low Trade Frequency } \downarrow$$
 > $$\text{Low Threshold } (\pm 1.0\sigma) \longrightarrow \text{Low Win Rate } \downarrow \ + \ \text{High Trade Frequency } \uparrow$$
 > 
@@ -136,7 +141,7 @@ print(df_prices[['Rolling_1M_diff_z', 'Rolling_6M_diff_z', 'Rolling_1Y_diff_z']]
 
 <br><br>
 
-# 補充：量化輪動交易系統研發筆記：Z-Score 核心理論
+# Lecture 2：補充 Z-Score 核心理論
 
 ## 什麼是 Z-Score（標準分數）？
 
@@ -144,7 +149,7 @@ print(df_prices[['Rolling_1M_diff_z', 'Rolling_6M_diff_z', 'Rolling_1Y_diff_z']]
 
 簡單來說，Z-Score 就像是市場的「體溫計」。它不關心絕對數值是幾元或百分之幾，它只告訴量化交易員：**「當前的市場異動，在歷史常態中到底有多罕見？」**
 
----
+<br>
 
 ## 1. 數學公式與統計學含意
 
@@ -166,11 +171,11 @@ $$Z = \frac{X - \mu}{\sigma}$$
 
 ---
 
-## 💡 2. 為什麼量化交易必須引入 Z-Score？（解決時空波動痛點）
+## 2. 為什麼量化交易必須引入 Z-Score？（解決時空波動痛點）
 
 在實際研發回測系統時，如果不將數據「無量綱化（Standardization）」，只看絕對價差，將會面臨嚴重的**時空定價非對稱災難**。
 
-### ❌ 傳統絕對價差的痛點：
+### 傳統絕對價差的痛點：
 假設我們觀察 $\text{SPY} - \text{RSP}$ 的滾動報酬率價差：
 *   **2008 年金融海嘯時期：** 市場波動極度劇烈，兩者價差可能在幾天內拉開 **5%**。
 *   **2017 年極低波動牛市：** 市場極度平靜，兩者價差只要拉開 **0.5%** 就已經是年度級別的極端事件。
@@ -198,13 +203,13 @@ $$Z = \frac{X - \mu}{\sigma}$$
     *   *市場含意：* 中小型股（RSP）異常狂飆，大盤權值股（SPY）被過度拋售，橡皮筋向左拉扯至極限。
     *   *策略動作：* 預期市場過熱情緒收斂，執行 **「賣出 RSP，換倉/輪動回 SPY」**。
 
-> 📌 **核心結論：** 
+> **核心結論：** 
 > Z-Score 的本質就是將混亂的價格波動，收斂為一條具有統計學邊界的「訊號線」。交易員的獲利來源（Alpha），正是源於市場從「發燒（極端 Z-Score）」回歸到「正常體溫（0 軸）」的必然統計規律。
 
 
 <br><br>
 
-# Lecture 2：從數據探索到 Z-Score 訊號建構 
+# Lecture 3：從數據探索到 Z-Score 訊號建構 
 
 ## 階段一：核心量化理論與策略動機
 
@@ -217,7 +222,7 @@ $$Z = \frac{X - \mu}{\sigma}$$
 
 為了精確量化橡皮筋被拉扯的程度，我們必須將價格數據進行**「取價差（Differential）」**與**「無量綱化（Z-Score Standardization）」**。
 
----
+<br>
 
 ## 階段二：統計學核心——擴展標準分數 (Expanding Z-Score)
 
@@ -238,7 +243,7 @@ $$Z = \frac{X - \mu}{\sigma}$$
 *   **量化解法：擴展視窗（Expanding Window）**
     系統利用從歷史起點到當前計算日 $t$ 的已知數據計算動態平均與標準差。隨著時間推移，已知資料庫會像滾雪球一樣越來越大（Expanding），但絕不滲透未來資訊，從而保證回測的真實性。
 
----
+<br>
 
 ## 階段三：Python 系統特徵工程實作
 
@@ -360,6 +365,8 @@ plt.show()
 
 隨著時間視窗拉長，訊號週期變長。1年期（1Y）圖表呈現明顯的右偏特徵（長期牛市 Beta 溢價導致多數時間報酬為正），但由於訊號存在嚴重滯後（Lagging），在捕捉橡皮筋快速彈回時顯得不夠敏銳。
 
+<br>
+
 ### 初始自動化策略規則藍圖（Trading Rules）
 
 基於 1M Z-Score 圖表的直覺規律，我們將交易進場門檻（Thresholds）設定在 $\pm 2.0\sigma$：
@@ -382,8 +389,6 @@ plt.show()
 
 ```
 
-<br><br>
-
 ### 權衡一：回看視窗的選擇（Optimal Lookback Window）
 我們應該選擇 **1個月（1M）**、**6個月（6M）** 還是 **1年期（1Y）** 的滾動報酬差來作為 Z-Score 的輸入特徵？
 
@@ -404,7 +409,7 @@ plt.show()
     *   數據落在 $\pm 1.0\sigma$ 之外的機率高達 $31.73\%$。
     *   *結果：* 交易頻次大幅提升，資金周轉率高。但因為信號並未達到真正的歷史極端值，均值回歸的動能不足，**單次勝率會顯著下降**，策略極易在常態波動中被雜訊洗出場。
 
----
+<br>
 
 ## 下階段回測實作觀測指標（Backtest KPIs）
 
