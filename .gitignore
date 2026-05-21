@@ -1,0 +1,83 @@
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# ── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*_tmp.ipynb
+
+# ── Large data files ─────────────────────────────────────────────────────────
+# Raw / binary data
+*.dat
+*.bin
+*.raw
+
+# Tabular data
+*.csv
+*.tsv
+
+# Excel
+*.xlsx
+*.xls
+*.xlsm
+
+# Parquet / Feather / Arrow (columnar formats used in trading/data science)
+*.parquet
+*.feather
+*.arrow
+
+# HDF5 / NetCDF
+*.h5
+*.hdf5
+*.nc
+*.nc4
+
+# Pickle / joblib
+*.pkl
+*.pickle
+*.joblib
+
+# SQLite / DuckDB / databases
+*.db
+*.sqlite
+*.sqlite3
+*.duckdb
+
+# Compressed archives
+*.zip
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tgz
+*.gz
+*.bz2
+*.7z
+*.rar
+*.zst
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs / temp ───────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.temp
